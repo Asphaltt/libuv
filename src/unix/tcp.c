@@ -34,11 +34,14 @@ static int new_socket(uv_tcp_t* handle, int domain, unsigned long flags) {
   int sockfd;
   int err;
 
+  // 创建 socket
   err = uv__socket(domain, SOCK_STREAM, 0);
   if (err < 0)
     return err;
   sockfd = err;
 
+  // 设置 tcp 选项；比如关闭拥塞控制 naggle 算法，开启 tcp 的 keepalive
+  // sockfd 将保存到 handle 里
   err = uv__stream_open((uv_stream_t*) handle, sockfd, flags);
   if (err) {
     uv__close(sockfd);
@@ -46,14 +49,17 @@ static int new_socket(uv_tcp_t* handle, int domain, unsigned long flags) {
   }
 
   if (flags & UV_HANDLE_BOUND) {
+    // 以下是需要绑定地址的情况，由 flags 决定
     /* Bind this new socket to an arbitrary port */
     slen = sizeof(saddr);
     memset(&saddr, 0, sizeof(saddr));
+    // 获取 socket 对应的地址
     if (getsockname(uv__stream_fd(handle), (struct sockaddr*) &saddr, &slen)) {
       uv__close(sockfd);
       return UV__ERR(errno);
     }
 
+    // 将 sockfd 绑定到对应的地址
     if (bind(uv__stream_fd(handle), (struct sockaddr*) &saddr, slen)) {
       uv__close(sockfd);
       return UV__ERR(errno);
@@ -156,11 +162,13 @@ int uv__tcp_bind(uv_tcp_t* tcp,
   if ((flags & UV_TCP_IPV6ONLY) && addr->sa_family != AF_INET6)
     return UV_EINVAL;
 
+  // 因为我们没有创建 socket，maybe_new_socket 里会创建 socket
   err = maybe_new_socket(tcp, addr->sa_family, 0);
   if (err)
     return err;
 
   on = 1;
+  // 默认复用端口
   if (setsockopt(tcp->io_watcher.fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
     return UV__ERR(errno);
 
@@ -184,6 +192,7 @@ int uv__tcp_bind(uv_tcp_t* tcp,
 #endif
 
   errno = 0;
+  // 将创建的 socket fd 绑定到 addr
   if (bind(tcp->io_watcher.fd, addr, addrlen) && errno != EADDRINUSE) {
     if (errno == EAFNOSUPPORT)
       /* OSX, other BSDs and SunoS fail with EAFNOSUPPORT when binding a
@@ -352,18 +361,23 @@ int uv_tcp_listen(uv_tcp_t* tcp, int backlog, uv_connection_cb cb) {
   */
   flags |= UV_HANDLE_BOUND;
 #endif
+  // 对于已 uv_tcp_bind 的 socket，maybe_new_socket 不做任何操作
   err = maybe_new_socket(tcp, AF_INET, flags);
   if (err)
     return err;
 
+  // 开始监听端口，该端口就是 uv_tcp_bind 里指定的地址端口
   if (listen(tcp->io_watcher.fd, backlog))
     return UV__ERR(errno);
 
+  // 设置新连接的回调函数
   tcp->connection_cb = cb;
   tcp->flags |= UV_HANDLE_BOUND;
 
   /* Start listening for connections. */
+  // cb 将在 uv__server_io 里调用
   tcp->io_watcher.cb = uv__server_io;
+  // 将 io 事件加入到 loop 里
   uv__io_start(tcp->loop, &tcp->io_watcher, POLLIN);
 
   return 0;

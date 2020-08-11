@@ -282,9 +282,9 @@ int uv_tcp_bind(uv_tcp_t* handle,
   if (handle->type != UV_TCP)
     return UV_EINVAL;
 
-  if (addr->sa_family == AF_INET)
+  if (addr->sa_family == AF_INET) // IPv4
     addrlen = sizeof(struct sockaddr_in);
-  else if (addr->sa_family == AF_INET6)
+  else if (addr->sa_family == AF_INET6) // IPv6
     addrlen = sizeof(struct sockaddr_in6);
   else
     return UV_EINVAL;

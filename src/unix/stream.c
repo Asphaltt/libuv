@@ -415,10 +415,12 @@ int uv__stream_open(uv_stream_t* stream, int fd, int flags) {
   stream->flags |= flags;
 
   if (stream->type == UV_TCP) {
+    // 关闭 naggle 算法
     if ((stream->flags & UV_HANDLE_TCP_NODELAY) && uv__tcp_nodelay(fd, 1))
       return UV__ERR(errno);
 
     /* TODO Use delay the user passed in. */
+    // 启用 tcp 的 keepalive
     if ((stream->flags & UV_HANDLE_TCP_KEEPALIVE) &&
         uv__tcp_keepalive(fd, 1, 60)) {
       return UV__ERR(errno);
@@ -670,6 +672,7 @@ int uv_listen(uv_stream_t* stream, int backlog, uv_connection_cb cb) {
   }
 
   if (err == 0)
+    // 将 stream 的 handle 状态更新为 active
     uv__handle_start(stream);
 
   return err;
