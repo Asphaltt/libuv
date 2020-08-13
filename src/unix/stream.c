@@ -536,6 +536,7 @@ void uv__server_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
   assert(stream->accepted_fd == -1);
   assert(!(stream->flags & UV_HANDLE_CLOSING));
 
+  // 新增一个 listen io 事件，因为原来的那个 io 事件已经被消费掉了
   uv__io_start(stream->loop, &stream->io_watcher, POLLIN);
 
   /* connection_cb can close the server socket while we're
@@ -549,6 +550,7 @@ void uv__server_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
       return;
 #endif /* defined(UV_HAVE_KQUEUE) */
 
+    // 接收新的 fd
     err = uv__accept(uv__stream_fd(stream));
     if (err < 0) {
       if (err == UV_EAGAIN || err == UV__ERR(EWOULDBLOCK))
@@ -568,6 +570,7 @@ void uv__server_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
     }
 
     UV_DEC_BACKLOG(w)
+    // 保存接收到的 fd 并调用用户设置的新连接回调函数
     stream->accepted_fd = err;
     stream->connection_cb(stream, 0);
 
@@ -601,6 +604,7 @@ int uv_accept(uv_stream_t* server, uv_stream_t* client) {
   switch (client->type) {
     case UV_NAMED_PIPE:
     case UV_TCP:
+      // 将 accepted_fd 保存到 client
       err = uv__stream_open(client,
                             server->accepted_fd,
                             UV_HANDLE_READABLE | UV_HANDLE_WRITABLE);

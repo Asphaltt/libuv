@@ -223,6 +223,7 @@ int uv__tcp_connect(uv_connect_t* req,
   if (handle->connect_req != NULL)
     return UV_EALREADY;  /* FIXME(bnoordhuis) UV_EINVAL or maybe UV_EBUSY. */
 
+  // 对于 client 向 server 发起新连接的情况，maybe_new_socket 会新建一个 socket
   err = maybe_new_socket(handle,
                          addr->sa_family,
                          UV_HANDLE_READABLE | UV_HANDLE_WRITABLE);
@@ -233,6 +234,7 @@ int uv__tcp_connect(uv_connect_t* req,
 
   do {
     errno = 0;
+    // 调用系统的 connect 函数
     r = connect(uv__stream_fd(handle), addr, addrlen);
   } while (r == -1 && errno == EINTR);
 
@@ -258,6 +260,7 @@ int uv__tcp_connect(uv_connect_t* req,
       return UV__ERR(errno);
   }
 
+  // 创建一个请求 handle，并将该 handle 添加到 loop
   uv__req_init(handle->loop, req, UV_CONNECT);
   req->cb = cb;
   req->handle = (uv_stream_t*) handle;
